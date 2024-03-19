@@ -1,0 +1,67 @@
+{
+  "orientation": "Vertical",
+  "nodeLayouts": {
+    "inputs": {
+      "x": 28.5,
+      "y": 62,
+      "index": -1
+    },
+    "outputs": {
+      "x": 28,
+      "y": 942,
+      "index": -1
+    },
+    "modify_query_with_history": {
+      "x": 84,
+      "y": 172,
+      "height": 75,
+      "index": 0
+    },
+    "lookup": {
+      "x": 84,
+      "y": 282,
+      "height": 75,
+      "index": 1
+    },
+    "generate_prompt_context": {
+      "x": 84,
+      "y": 392,
+      "height": 75,
+      "index": 2
+    },
+    "Prompt_variants": {
+      "x": 28.5,
+      "y": 502,
+      "height": 75,
+      "index": 3
+    },
+    "chat_with_context": {
+      "x": 83.5,
+      "y": 612,
+      "height": 75,
+      "index": 4
+    },
+    "run_function": {
+      "x": 83.5,
+      "y": 722,
+      "height": 75,
+      "index": 5
+    },
+    "LLM_node": {
+      "x": 28,
+      "y": 832,
+      "height": 75,
+      "index": 6
+    }
+  },
+  "viewport": {
+    "transformMatrix": [
+      0.8947367504000732,
+      0,
+      0,
+      0.8947367504000732,
+      96.19736918203216,
+      -416.1533953095212
+    ]
+  }
+}

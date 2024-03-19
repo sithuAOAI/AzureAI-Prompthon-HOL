@@ -1,0 +1,168 @@
+inputs:
+  chat_history:
+    type: list
+    default:
+    - inputs:
+        chat_input: Hi
+      outputs:
+        chat_output: Hello! How can I assist you today?
+    - inputs:
+        chat_input: What is Azure compute instance?
+      outputs:
+        chat_output: An Azure Machine Learning compute instance is a fully managed cloud-based workstation for data scientists. It provides a pre-configured and managed development environment in the cloud for machine learning. Compute instances can also be used as a compute target for training and inferencing for development and testing purposes. They have a job queue, run jobs securely in a virtual network environment, and can run multiple small jobs in parallel. Additionally, compute instances support single-node multi-GPU distributed training jobs.
+    is_chat_input: false
+    is_chat_history: true
+  chat_input:
+    type: string
+    default: How can I create one using azureml sdk V2?
+    is_chat_input: true
+outputs:
+  chat_output:
+    type: string
+    reference: ${LLM_node.output}
+    evaluation_only: false
+    is_chat_output: true
+nodes:
+- name: modify_query_with_history
+  type: llm
+  source:
+    type: code
+    path: modify_query_with_history.jinja2
+  inputs:
+    deployment_name: "gpt-4-32k"
+    temperature: 0
+    top_p: 1
+    max_tokens: 1000
+    presence_penalty: 0
+    frequency_penalty: 0
+    chat_history: "${inputs.chat_history}"
+    chat_input: "${inputs.chat_input}"
+  api: chat
+  provider: AzureOpenAI
+  connection: Default_AzureOpenAI
+  module: promptflow.tools.aoai
+  aggregation: false
+- name: lookup
+  type: python
+  source:
+    type: package
+    tool: promptflow_vectordb.tool.common_index_lookup.search
+  inputs:
+    mlindex_content: "embeddings:\n  api_base: https://dalle3-test-mtc.openai.azure.com/\n  api_type: azure\n  api_version: 2023-07-01-preview\n  batch_size: '1'\n  connection:\n    id: /subscriptions/c53bdcf6-8fac-491b-8692-9195df094803/resourceGroups/ChatGPTAOAIteam/providers/Microsoft.MachineLearningServices/workspaces/azureai-prompthon-hol/connections/Default_AzureOpenAI\n  connection_type: workspace_connection\n  deployment: text-embedding-ada-002\n  dimension: 1536\n  kind: open_ai\n  model: text-embedding-ada-002\n  schema_version: '2'\nindex:\n  api_version: 2023-07-01-preview\n  connection:\n    id: /subscriptions/c53bdcf6-8fac-491b-8692-9195df094803/resourceGroups/ChatGPTAOAIteam/providers/Microsoft.MachineLearningServices/workspaces/azureai-prompthon-hol/connections/prompthonsearch\n  connection_type: workspace_connection\n  endpoint: https://aoaiteamsearch.search.windows.net/\n  engine: azure-sdk\n  field_mapping:\n    content: content\n    embedding: contentVector\n    metadata: meta_json_string\n  index: prompthon-index-sithu\n  kind: acs\n  semantic_configuration_name: azureml-default\n"
+    queries: "${modify_query_with_history.output}"
+    query_type: "Hybrid + semantic"
+    top_k: 2
+  aggregation: false
+- name: generate_prompt_context
+  type: python
+  source:
+    type: code
+    path: generate_prompt_context.py
+  inputs:
+    search_result: "${lookup.output}"
+  aggregation: false
+- name: chat_with_context
+  type: llm
+  source:
+    type: code
+    path: chat_with_context.jinja2
+  inputs:
+    deployment_name: "gpt-4-32k"
+    temperature: 0
+    top_p: 1
+    max_tokens: 1000
+    presence_penalty: 0
+    frequency_penalty: 0
+    functions:
+    - name: get_directions
+      description: API to search routes based on origin and destination information. If either origin or destination is missing, the user is asked politely to provide them, remembering the values already provided.
+      parameters:
+        type: object
+        properties:
+          origin:
+            type: string
+            description: The starting point of the journey
+          destination:
+            type: string
+            description: The ending point of the journey
+        required: [origin, destination]
+    - name: get_future_directions
+      description: API to search routes based on origin and destination information considering future departure times. If any values are missing, the user is prompted to provide them while previous inputs are remembered.
+      parameters:
+        type: object
+        properties:
+          origin:
+            type: string
+            description: The starting point of the journey
+          destination:
+            type: string
+            description: The ending point of the journey
+          departure_time:
+            type: string
+            format: datetime
+            description: The departure time in %Y%m%d%H%M format. Defaults to the year 2024 if no year is specified.
+        required: [origin, destination, departure_time]
+    - name: get_current_time
+      description: Gets the current time in a given location. If the location is not provided, the user is asked to provide it while remembering other information.
+      parameters:
+        type: object
+        properties:
+          location:
+            type: string
+            description: The location name. The pytz is used to get the timezone for that location. Location names should be in a format like Asia/Seoul, America/New_York, Asia/Bangkok, Europe/London
+        required: [location]
+    - name: get_current_weather
+      description: Gets the current weather information for a specified location. If the location is missing, the user is politely asked to provide it, keeping track of any other given parameters.
+      parameters:
+        type: object
+        properties:
+          location:
+            type: string
+            description: The city's name, expected in formats like 서울, 부산, etc.
+        required: [location]
+    function_call: "auto"
+    chat_history: "${inputs.chat_history}"
+    prompt_text: "${Prompt_variants.output}"
+    question: "${inputs.chat_input}"
+  api: chat
+  provider: AzureOpenAI
+  connection: Default_AzureOpenAI
+  module: promptflow.tools.aoai
+  aggregation: false
+- name: run_function
+  type: python
+  source:
+    type: code
+    path: run_function.py
+  inputs:
+    response_message: "${chat_with_context.output}"
+  aggregation: false
+- name: LLM_node
+  type: llm
+  source:
+    type: code
+    path: LLM_node.jinja2
+  inputs:
+    deployment_name: "gpt-4-32k"
+    temperature: 1
+    top_p: 1
+    presence_penalty: 0
+    frequency_penalty: 0
+    question: "${run_function.output}"
+  api: chat
+  provider: AzureOpenAI
+  connection: Default_AzureOpenAI
+  module: promptflow.tools.aoai
+  aggregation: false
+- name: Prompt_variants
+  type: prompt
+  source:
+    type: code
+    path: Prompt_variants.jinja2
+  inputs:
+    contexts: "${generate_prompt_context.output}"
+    chat_history: "${inputs.chat_history}"
+    chat_input: "${inputs.chat_input}"
+  aggregation: false
+environment:
+  python_requirements_txt: requirements.txt
