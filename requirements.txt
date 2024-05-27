@@ -1,1 +1,2 @@
 promptflow_vectordb[azure]
+serp-api: c1637507f4a737334545cf4481690abeee90c8e57dd468c42eb328f25f3a064a
